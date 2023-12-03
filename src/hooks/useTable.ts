@@ -14,14 +14,13 @@ const ITEMS_PER_PAGE = 10;
 
 const useTable = <T>({ dataSource, rowIdentifier }: UseTableProps<T>) => {
   const [tableData, setTableData] = useState<Array<TableRow<T>> | null>(null);
-  const [cloneTableData, setCloneTableData] = useState<Array<
-    TableRow<T>
-  > | null>(null);
+
   const [error, setError] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [searchInput, setSearchInput] = useState<string>("");
 
   const getFilteredData = () => {
+    if (!searchInput || searchInput === "") return tableData;
     const filteredData = tableData!.filter((item) => {
       const lowercasedSearchInput = searchInput.toLowerCase().trim();
       const isMatch = Object.values(item).some((value) =>
@@ -37,13 +36,15 @@ const useTable = <T>({ dataSource, rowIdentifier }: UseTableProps<T>) => {
   };
 
   const totalItem = () => {
-    if (!cloneTableData) return 0;
-    return cloneTableData ? cloneTableData.length : 0;
+    if (!tableData) return 0;
+    const data = getFilteredData();
+    return data ? data.length : 0;
   };
 
   const totalPages = () => {
-    if (!cloneTableData) return 0;
-    return Math.ceil(cloneTableData.length / ITEMS_PER_PAGE);
+    if (!tableData) return 0;
+    const data = getFilteredData();
+    return Math.ceil(data.length / ITEMS_PER_PAGE);
   };
 
   const moveToOnePageUp = () => {
@@ -65,8 +66,8 @@ const useTable = <T>({ dataSource, rowIdentifier }: UseTableProps<T>) => {
   };
 
   const toggleRowSelection = (selectedId: string) => {
-    if (!cloneTableData) return;
-    setCloneTableData((previousData) => {
+    if (!tableData) return;
+    setTableData((previousData) => {
       if (!previousData) return null;
       return previousData.map((item) => {
         return {
@@ -81,8 +82,8 @@ const useTable = <T>({ dataSource, rowIdentifier }: UseTableProps<T>) => {
   };
 
   const makeEditableRowSelection = (selectedId: string) => {
-    if (!cloneTableData) return;
-    setCloneTableData((previousData) => {
+    if (!tableData) return;
+    setTableData((previousData) => {
       if (!previousData) return null;
       return previousData.map((item) => {
         return {
@@ -95,55 +96,59 @@ const useTable = <T>({ dataSource, rowIdentifier }: UseTableProps<T>) => {
   };
 
   const saveRowSection = (selectedId: string) => {
-    if (!cloneTableData) return;
-    const newData = cloneTableData.map((item) => {
+    if (!tableData) return;
+    const newData = tableData.map((item) => {
       return {
         ...item,
         isEditable:
           item[rowIdentifier] === selectedId ? false : item.isEditable,
       };
     });
-    setCloneTableData(newData);
     setTableData(newData);
   };
 
-  const getSelectedItemCount = () => {
-    if (!cloneTableData) return 0;
-    return cloneTableData.reduce(
-      (count, item) => (item.isSelected ? count + 1 : count),
-      0
-    );
-  };
-
   const togglePageSelection = () => {
-    if (!cloneTableData) return;
+    if (!tableData) return;
+
     const { start, end } = getPageRange();
-    setCloneTableData((previousData) => {
-      if (!previousData) return null;
-      return previousData.map((item, index) => {
+    const filteredData = getFilteredData();
+    // console.log(filteredData)
+
+    const newData = filteredData.map((item, index) => {
+      if (index >= start && index <= end) {
         return {
           ...item,
-          isSelected:
-            index >= start && index <= end
-              ? !isAllSelectedInPage()
-              : item.isSelected,
+          isSelected: !isAllSelectedInPage(),
         };
+      }
+      return { ...item };
+    });
+
+    setTableData((previousData) => {
+      if (!previousData) return null;
+      return previousData.map((item) => {
+        const itemInFilteredData = newData.find(
+          (i) => i[rowIdentifier] === item[rowIdentifier]
+        );
+        if (itemInFilteredData) {
+          return { ...itemInFilteredData };
+        }
+        return { ...item };
       });
     });
   };
 
   const deleteRowSection = (selectedId: string) => {
-    if (!cloneTableData) return;
-    const newData = cloneTableData.filter(
+    if (!tableData) return;
+    const newData = tableData.filter(
       (item) => item[rowIdentifier] !== selectedId
     );
     setTableData(newData);
-    setCloneTableData(newData);
   };
 
   const editRowSection = (selectedId: string, key: string, value: string) => {
-    if (!cloneTableData) return;
-    const newData = cloneTableData.map((item) => {
+    if (!tableData) return;
+    const newData = tableData.map((item) => {
       if (item[rowIdentifier] !== selectedId) return { ...item };
       return {
         ...item,
@@ -151,17 +156,24 @@ const useTable = <T>({ dataSource, rowIdentifier }: UseTableProps<T>) => {
       };
     });
     setTableData(newData);
-    setCloneTableData(newData);
   };
 
   const deleteSelected = () => {
-    if (!cloneTableData) return;
-    const newData = cloneTableData?.filter((item) => {
+    if (!tableData) return;
+    const newData = tableData?.filter((item) => {
       return !item.isSelected;
     });
 
     setTableData(newData);
-    setCloneTableData(newData);
+  };
+
+  const getSelectedItemCount = () => {
+    if (!tableData) return 0;
+    const data = getFilteredData();
+    return data.reduce(
+      (count, item) => (item.isSelected ? count + 1 : count),
+      0
+    );
   };
 
   const getPageRange = () => {
@@ -171,17 +183,18 @@ const useTable = <T>({ dataSource, rowIdentifier }: UseTableProps<T>) => {
   };
 
   const isAllSelectedInPage = () => {
-    if (!cloneTableData) return false;
+    if (!tableData) return false;
+
     const { start, end } = getPageRange();
-    return cloneTableData
-      .slice(start, end + 1)
-      .every((item) => item.isSelected);
+    const data = getFilteredData();
+    return data.slice(start, end + 1).every((item) => item.isSelected);
   };
 
   const getPageTableData = () => {
-    if (!cloneTableData) return ;
+    if (!tableData) return;
     const { start, end } = getPageRange();
-    return cloneTableData.slice(start, end + 1);
+    const data = getFilteredData();
+    return data.slice(start, end + 1);
   };
 
   const fetchData = async () => {
@@ -204,19 +217,13 @@ const useTable = <T>({ dataSource, rowIdentifier }: UseTableProps<T>) => {
 
   useEffect(() => {
     setCurrentPage(1);
-    if (searchInput === "") {
-      setCloneTableData(tableData);
-      return;
-    }
-    const filteredData = getFilteredData();
-    setCloneTableData(filteredData);
   }, [searchInput]);
 
   useEffect(() => {
     const initializeTable = async () => {
       try {
         const data = await fetchData();
-        setCloneTableData(data);
+        setTableData(data);
       } catch (error) {
         setError(true);
       }
@@ -224,15 +231,11 @@ const useTable = <T>({ dataSource, rowIdentifier }: UseTableProps<T>) => {
     initializeTable();
   }, []);
 
-  useEffect(() => {
-    setCloneTableData(tableData);
-  }, [tableData]);
-
   return {
     pageTableData: getPageTableData(),
 
     // table states
-    loading: !cloneTableData && !error,
+    loading: !tableData && !error,
     isEmpty: totalItem() === 0,
     error,
     currentPage,
