@@ -179,7 +179,7 @@ const useTable = <T>({ dataSource, rowIdentifier }: UseTableProps<T>) => {
   };
 
   const getPageTableData = () => {
-    if (!cloneTableData) return false;
+    if (!cloneTableData) return ;
     const { start, end } = getPageRange();
     return cloneTableData.slice(start, end + 1);
   };
